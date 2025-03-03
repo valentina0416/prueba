@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordatorio por Voz</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        button, select { margin: 10px; padding: 10px; font-size: 16px; cursor: pointer; }
+        audio { margin-top: 10px; display: block; }
+    </style>
+</head>
+<body>
+
+    <h2>🎤 Recordatorio por Voz</h2>
+    <button id="startRecord">🎙️ Grabar Nota</button>
+    <button id="stopRecord" disabled>⏹️ Detener</button>
+    <button id="deleteAudio" disabled>🗑️ Borrar Nota</button>
+    
+    <audio id="audioPlayback" controls></audio>
+
+    <h3>⏰ Configurar Recordatorio:</h3>
+    <select id="reminderTime">
+        <option value="15000">15 segundos</option>
+        <option value="300000">5 minutos</option>
+        <option value="900000">15 minutos</option>
+        <option value="3600000">1 hora</option>
+    </select>
+    <button id="setReminder">🔔 Establecer Recordatorio</button>
+
+    <script>
+
+        Notification.permission
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+
+        document.getElementById("startRecord").addEventListener("click", async () => {
+            try {
+                let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                audioChunks = [];
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", () => {
+                    let audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+                    let audioUrl = URL.createObjectURL(audioBlob);
+                    document.getElementById("audioPlayback").src = audioUrl;
+                    
+                    let reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        localStorage.setItem("savedAudio", reader.result);
+                    };
+
+                    document.getElementById("deleteAudio").disabled = false;
+                });
+
+                document.getElementById("startRecord").disabled = true;
+                document.getElementById("stopRecord").disabled = false;
+            } catch (error) {
+                alert("No se pudo acceder al micrófono.");
+            }
+        });
+
+        document.getElementById("stopRecord").addEventListener("click", () => {
+            mediaRecorder.stop();
+            document.getElementById("startRecord").disabled = false;
+            document.getElementById("stopRecord").disabled = true;
+        });
+
+        document.getElementById("deleteAudio").addEventListener("click", () => {
+            localStorage.removeItem("savedAudio");
+            document.getElementById("audioPlayback").src = "";
+            document.getElementById("deleteAudio").disabled = true;
+        });
+
+        let savedAudio = localStorage.getItem("savedAudio");
+        if (savedAudio) {
+            document.getElementById("audioPlayback").src = savedAudio;
+            document.getElementById("deleteAudio").disabled = false;
+        }
+
+        document.getElementById("setReminder").addEventListener("click", () => {
+            let reminderTime = document.getElementById("reminderTime").value;
+
+            if (Notification.permission !== "granted") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        scheduleReminder(reminderTime);
+                    } else {
+                        alert("Activa las notificaciones para recibir recordatorios.");
+                    }
+                });
+            } else {
+                scheduleReminder(reminderTime);
+            }
+        });
+
+        function scheduleReminder(time) {
+            setTimeout(() => {
+                new Notification("📢 Recordatorio de voz", {
+                    body: "Tienes una nota de voz pendiente. ¡Escúchala ahora!",
+                });
+            }, time);
+
+            alert("🔔 Recordatorio establecido. Te avisaremos en el tiempo elegido.");
+        }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log("Service Worker registrado", reg))
+            .catch(err => console.log("Error al registrar el Service Worker", err));
+        }
+        
+    </script>
+
+</body>
+</html>
+
+
